@@ -1,11 +1,161 @@
-<\!DOCTYPE html>
-<html>
-  <head>
-    <meta charset='UTF-8'>
-    <title>World of Echos</title>
-  </head>
-  <body>
-    <h1>Hola, World of Echos 🚀</h1>
-    <p>Primera prueba con GitHub Pages.</p>
-  </body>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>World of Echos - Prototipo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<style>
+  body{margin:0;background:#111;color:#eee;font-family:sans-serif;}
+  #game{background:#222;display:block;margin:0 auto;image-rendering:pixelated;}
+  #ui{position:fixed;top:10px;left:10px;background:#000a;padding:10px;border-radius:6px;font-size:14px;}
+  #dialog{position:fixed;bottom:10px;left:10px;right:10px;background:#000c;padding:10px;border-radius:6px;display:none;}
+  #start{position:fixed;top:0;left:0;width:100%;height:100%;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#eee;}
+  #start input, #start select, #start button{margin:6px;padding:6px;}
+</style>
+</head>
+<body>
+
+<div id="start">
+  <h1>World of Echos</h1>
+  <label>Nombre: <input id="playerName" maxlength="12"></label>
+  <label>Género: 
+    <select id="gender">
+      <option value="hombre">Hombre</option>
+      <option value="mujer">Mujer</option>
+    </select>
+  </label>
+  <label>Color de outfit: <input type="color" id="color" value="#5aa2ff"></label>
+  <button onclick="startGame()">Comenzar</button>
+</div>
+
+<canvas id="game" width="800" height="480"></canvas>
+<div id="ui"></div>
+<div id="dialog"></div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+let state="start"; // start, play, dialog, capture
+let player,creature,dialogMsg="",keys={},floor=0;
+let collection=JSON.parse(localStorage.getItem("collection")||"[]");
+
+// controles
+window.addEventListener("keydown",e=>{keys[e.key.toLowerCase()]=true;});
+window.addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false;});
+
+// datos criaturas
+const pool=[
+  {name:"Común",color:"#5c9e5c",prob:0.80},
+  {name:"Rara",color:"#5c5c9e",prob:0.18},
+  {name:"Épica",color:"#9e5c9e",prob:0.02},
+  {name:"Ultra",color:"#ffd700",prob:0.001}
+];
+
+// crear jugador
+function startGame(){
+  let name=document.getElementById("playerName").value||"Explorador";
+  let gender=document.getElementById("gender").value;
+  let color=document.getElementById("color").value;
+  player={x:100,y:100,vx:0,vy:0,w:20,h:28,color, name, gender, onGround:false};
+  state="play";
+  document.getElementById("start").style.display="none";
+  spawnCreature();
+}
+
+// spawn criatura según rareza
+function spawnCreature(){
+  let roll=Math.random();
+  let acc=0;
+  for(const c of pool){
+    acc+=c.prob;
+    if(roll<=acc){creature={x:400,y:400,w:20,h:20,...c};return;}
+  }
+  creature=null;
+}
+
+// lógica
+function update(){
+  if(state!=="play") return;
+
+  // movimiento
+  let speed=2.5;
+  if(keys["a"]||keys["arrowleft"]) player.vx=-speed;
+  else if(keys["d"]||keys["arrowright"]) player.vx=speed;
+  else player.vx=0;
+
+  if((keys["w"]||keys["arrowup"]||keys[" "])&&player.onGround){
+    player.vy=-7; player.onGround=false;
+  }
+
+  // física simple
+  player.vy+=0.3; // gravedad
+  player.x+=player.vx; player.y+=player.vy;
+
+  // suelo
+  if(player.y+player.h>canvas.height-30){
+    player.y=canvas.height-30-player.h; player.vy=0; player.onGround=true;
+  }
+
+  // colisión con criatura
+  if(creature && Math.abs(player.x-creature.x)<20 && Math.abs(player.y-creature.y)<20){
+    state="capture";
+    dialogMsg=`Has encontrado una criatura ${creature.name}! Pulsa ENTER para afinarla.`;
+    showDialog(dialogMsg);
+  }
+}
+
+// dibujo
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // suelo
+  ctx.fillStyle="#333"; ctx.fillRect(0,canvas.height-30,canvas.width,30);
+
+  // jugador
+  if(player){
+    ctx.fillStyle=player.color;
+    ctx.fillRect(player.x,player.y,player.w,player.h);
+  }
+
+  // criatura
+  if(creature){
+    ctx.fillStyle=creature.color;
+    ctx.fillRect(creature.x,creature.y,creature.w,creature.h);
+  }
+}
+
+function showDialog(msg){
+  let box=document.getElementById("dialog");
+  box.style.display="block";
+  box.textContent=msg;
+}
+function hideDialog(){document.getElementById("dialog").style.display="none";}
+
+// captura
+window.addEventListener("keydown",e=>{
+  if(state==="capture" && e.key==="Enter"){
+    collection.push({name:creature.name,date:Date.now()});
+    localStorage.setItem("collection",JSON.stringify(collection));
+    hideDialog();
+    state="play"; creature=null;
+    alert("¡Has afinado y coleccionado la criatura "+collection[collection.length-1].name+"!");
+  }
+});
+
+// HUD
+function updateUI(){
+  document.getElementById("ui").textContent=
+    `${player?player.name:""} | Criaturas: ${collection.length}`;
+}
+
+// loop
+function loop(){
+  update();
+  render();
+  updateUI();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
 </html>
